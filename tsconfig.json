@@ -1,0 +1,14 @@
+{
+    "compileOnSave": true,
+    "compilerOptions": {
+        "declaration": true,
+        "module": "commonjs",
+        "noImplicitAny": true,
+        "outDir": "./lib",
+        "strictNullChecks": true,
+        "target": "es5"
+    },
+    "include": [
+        "src/**/*.ts"
+    ]
+}
