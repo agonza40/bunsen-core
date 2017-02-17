@@ -1,5 +1,5 @@
 import './typedefs'
-import _ from 'lodash'
+import * as _ from 'lodash'
 
 /* eslint-disable complexity */
 /**
@@ -9,7 +9,8 @@ import _ from 'lodash'
  */
 export function doesModelContainRequiredField (model) {
   if (Array.isArray(model)) {
-    for (let i = 0, len = model.length; i < len; i++) {
+    let len = model.length
+    for (let i = 0; i < len; i++) {
       if (doesModelContainRequiredField(model[i])) {
         return true
       }
@@ -41,7 +42,7 @@ export function doesModelContainRequiredField (model) {
  * @param {String} id - the dotted refeference to this object
  * @returns {String} the user-visible label
  */
-export function getLabel (label, model, id) {
+export function getLabel (label: String, model, id) {
   const title = model ? model.title : null
   let idLabel = (id) ? _.startCase(id.split('.').slice(-1)[0]) : ''
   idLabel = _.capitalize(idLabel.toLowerCase())
@@ -65,7 +66,7 @@ export function getLabel (label, model, id) {
  * @param {String} [dependencyReference] - the dotted reference to the model dependency
  * @returns {String} the proper dotted path in the model schema (or undefined if it's a bad path)
  */
-export function getModelPath (reference, dependencyReference) {
+export function getModelPath (reference: string, dependencyReference?: string) {
   const pattern = /^[^\.](.*[^\.])?$/ // eslint-disable-line no-useless-escape
   let path = pattern.test(reference) ? `properties.${reference.split('.').join('.properties.')}` : undefined
 

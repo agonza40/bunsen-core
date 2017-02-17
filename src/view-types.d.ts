@@ -137,8 +137,10 @@ export interface BunsenCell {
   }
 }
 
+type BunsenCellSet = {[index:string]:BunsenCell}
+
 export interface BunsenView {
-  cellDefinitions: {[index:string]:BunsenCell};
+  cellDefinitions: BunsenCellSet
   cells: BunsenCell[];
   version: string;
   type: 'detail' | 'form';

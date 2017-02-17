@@ -1,5 +1,6 @@
-
-import _ from 'lodash'
+import {BunsenModel, BunsenModelSet, BunsenValidationResult} from './model-types'
+import {BunsenView} from './view-types'
+import * as _ from 'lodash'
 import {validateValue} from './validator'
 import {aggregateResults} from './validator/utils'
 import {getPath} from './dereference'
@@ -9,7 +10,7 @@ export const VALIDATION_RESOLVED = 'VALIDATION_RESOLVED'
 export const CHANGE_MODEL = 'SET_MODEL'
 export const CHANGE_VIEW = 'CHANGE_VIEW'
 
-export function changeValue (bunsenId, value) {
+export function changeValue (bunsenId: string, value: any) {
   return {
     type: CHANGE_VALUE,
     bunsenId,
@@ -17,21 +18,21 @@ export function changeValue (bunsenId, value) {
   }
 }
 
-export function changeModel (model) {
+export function changeModel (model: BunsenModel) {
   return {
     type: CHANGE_MODEL,
     model
   }
 }
 
-export function changeView (view) {
+export function changeView (view: BunsenView) {
   return {
     type: CHANGE_VIEW,
     view
   }
 }
 
-export function updateValidationResults (validationResult) {
+export function updateValidationResults (validationResult: BunsenValidationResult) {
   const errorsByInput = _.groupBy(validationResult.errors, 'path')
   const errorsFilteredToMessagesOnly = _.mapValues(
     errorsByInput,
@@ -46,26 +47,27 @@ export function updateValidationResults (validationResult) {
   }
 }
 
-function invalidPath (refPath) {
+function invalidPath (refPath: string) {
   console.warn(`${refPath} is not a valid path`)
-  return {}
+  return {} as BunsenModel
 }
 
-function schemaFromRef (definitions) {
+type SchemaRefResolver = (refPath: string, resolveRef: SchemaRefResolver) => BunsenModel
+function schemaFromRef (definitions: BunsenModelSet): SchemaRefResolver {
   if (definitions === undefined) {
-    return function (refPath) {
+    return function (refPath: string) {
       const schema = invalidPath(refPath)
       console.warn('"$ref" can not be used, "definitions" is not defined for this schema')
       return schema
     }
   }
 
-  return function (refPath, resolveRef) {
+  return function (refPath: string, resolveRef: SchemaRefResolver) {
     const pathStack = refPath.split('/').reverse()
     if (pathStack.pop() !== '#' || pathStack.pop() !== 'definitions') {
       return invalidPath(refPath)
     }
-    const startingSchema = definitions[pathStack.pop()]
+    const startingSchema = definitions[pathStack.pop() as string]
     if (pathStack.length <= 0) {
       return startingSchema
     }
@@ -73,29 +75,37 @@ function schemaFromRef (definitions) {
   }
 }
 
-function getSchema (pathStack, model, resolveRef) {
+function getSchema (
+  pathStack: string[] | null, model: BunsenModel, resolveRef: SchemaRefResolver
+): BunsenModel {
   if (model.$ref !== undefined) {
     return resolveRef(model.$ref, resolveRef)
   }
-
+  if (pathStack === null) {
+    return {} as BunsenModel
+  }
   if (pathStack.length <= 0) {
     return model
   }
 
   if (model.properties) {
-    const current = pathStack.pop()
+    const current = pathStack.pop() as string
     return getSchema(pathStack, model.properties[current], resolveRef)
   }
 
   if (model.items) { // This model is an array
-    pathStack.pop() // Remove index since it doesn't provide any more useful information
-    return getSchema(pathStack, model.items, resolveRef)
+    const index = pathStack.pop() // Index is useful if items is an array (treated like tuple)
+    if (model.items instanceof Array) {
+      return getSchema(pathStack, model.items[0], resolveRef)
+    } else {
+      return getSchema(pathStack, model.items, resolveRef)
+    }
   }
 
-  return {}
+  return {} as BunsenModel
 }
 
-function findSchema (model, path, resolveRef) {
+function findSchema (model: BunsenModel, path: string, resolveRef: SchemaRefResolver): BunsenModel {
   if (model.$ref !== undefined) {
     return getSchema(null, model, resolveRef)
   } else if (path === null) {
@@ -106,11 +116,17 @@ function findSchema (model, path, resolveRef) {
   return getSchema(pathStack, model, resolveRef)
 }
 
-function isObjectSchema (schema) {
-  return schema.type === 'object' || schema.properties
+function isObjectSchema (schema: BunsenModel): boolean {
+  return schema.type === 'object' || schema.properties !== undefined
 }
 
-function findDefaults (value, path, model, resolveRef, required) {
+function findDefaults (
+  value: any,
+  path: string,
+  model: BunsenModel,
+  resolveRef: SchemaRefResolver,
+  required: boolean
+): any {
   const schema = findSchema(model, path, resolveRef)
 
   const schemaDefault = _.clone(schema.default)
@@ -162,9 +178,14 @@ function dispatchUpdatedResults (dispatch, results) {
  * @returns {Function} Function to asynchronously validate
  */
 export function validate (
-  bunsenId, inputValue, renderModel, validators, all = Promise.all, forceValidation = false
+  bunsenId: string,
+  inputValue: any,
+  renderModel: BunsenModel,
+  validators,
+  all = Promise.all,
+  forceValidation = false
 ) {
-  return function (dispatch, getState) {
+  return function (dispatch: (arg: any)=>{}, getState: () => any) {
     let formValue = getState().value
 
     const isInputValueEmpty = isEmptyValue(inputValue)

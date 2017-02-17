@@ -1,7 +1,9 @@
 'use strict'
 
 import '../typedefs'
-import _ from 'lodash'
+import {BunsenCell} from '../view-types'
+import {BunsenModel} from '../model-types'
+import * as _ from 'lodash'
 
 import {getSubModel} from '../utils'
 import viewSchema from './view-schemas/v2'
@@ -12,11 +14,21 @@ import {
   aggregateResults
 } from './utils'
 
-function createFactory (proto) {
-  const factory = function () {
+export interface Initiable {
+  init (...args: any[]): any
+  [index: string]: any
+}
+
+export interface Factory<T> {
+  (): T
+  proto: T
+}
+
+function createFactory<T extends Initiable> (proto: T): Factory<T> {
+  const factory: Factory<T> = function () {
     const obj = Object.create(proto)
     return obj.init.apply(obj, arguments)
-  }
+  } as Factory<T>
 
   factory.proto = proto
 
@@ -28,7 +40,7 @@ function createFactory (proto) {
  * @param {BunsenCell} cell - the cell to check
  * @returns {Boolean} true if the cell specifies a custom renderer
  */
-function isCustomCell (cell) {
+function isCustomCell (cell: BunsenCell): Boolean {
   return cell.renderer !== undefined
 }
 
@@ -37,8 +49,8 @@ function isCustomCell (cell) {
  * @param {BunsenModel} model - the model to check
  * @returns {Boolean} true if model is and array of objects
  */
-function isObjectArray (model) {
-  return (model.type === 'array') && (model.items.type === 'object')
+function isObjectArray (model: BunsenModel) {
+  return (model.type === 'array') && (_.get(model, 'items.type') === 'object')
 }
 
 /**
@@ -73,7 +85,7 @@ export default createFactory({
    * @param {BunsenModel} model - the model to use to verify references against
    * @returns {BunsenValidationResult} the results of the sub-cell validation
    */
-  _validateSubCell (path, cellId, model) {
+  _validateSubCell (path: string, cellId: string, model: BunsenModel) {
     const results = []
     const cell = this.cellDefinitions[cellId]
     if (cell === undefined) {
@@ -93,7 +105,7 @@ export default createFactory({
    * @param {BunsenCell} cell - the cell to validate
    * @returns {BunsenValidationResult} the results of the cell validation
    */
-  _validateCustomCell (path, cell) {
+  _validateCustomCell (path: string, cell: BunsenCell) {
     const results = [
       {
         errors: []

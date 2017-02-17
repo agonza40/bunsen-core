@@ -18,7 +18,7 @@ const INITIAL_VALUE = {
   valueChangeSet: null
 }
 
-function isArrayItem (segment) {
+function isArrayItem (segment: string): boolean {
   return /^\d+$/.test(segment)
 }
 
@@ -50,12 +50,12 @@ export function initialState (state) {
 
 function immutableOnce (object) {
   if (object === null || object === undefined) {
-    return immutable({})
+    return immutable.from({})
   }
 
   let immutableObject = object
   if (object.asMutable === undefined) {
-    immutableObject = immutable(object)
+    immutableObject = immutable.from(object)
   }
   return immutableObject
 }

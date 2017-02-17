@@ -1,6 +1,7 @@
 import './typedefs'
-
-import _ from 'lodash'
+import {BunsenCell, BunsenCellSet, BunsenView} from './view-types'
+import {BunsenModel, BunsenModelSet} from './model-types'
+import * as _ from 'lodash'
 
 import {dereference} from './dereference'
 
@@ -9,11 +10,14 @@ import {dereference} from './dereference'
  * @param {BunsenModelSet} properties - the properties for the model (key-value)
  * @returns {String[]} an array of property names in the order we should display them
  */
-function getPropertyOrder (properties) {
-  const primitiveProps = []
-  const complexProps = []
+function getPropertyOrder (properties?: BunsenModelSet): string[] {
+  if (properties === undefined) {
+    return []
+  }
+  const primitiveProps: string[] = []
+  const complexProps: string[] = []
 
-  _.forIn(properties, (prop, propName) => {
+  _.forIn(properties, (prop: BunsenModel, propName: string) => {
     if (prop.type === 'object' || prop.type === 'array') {
       complexProps.push(propName)
     } else {
@@ -31,13 +35,13 @@ function getPropertyOrder (properties) {
  * @param {BunsenCell[]} cellDefinitions - the cells set to add the model cell to
  * @returns {String} the cell name
  */
-function addModelCell (propertyName, model, cellDefinitions) {
+function addModelCell (propertyName: string, model: BunsenModel, cellDefinitions: BunsenCellSet): string {
   const cell = {
     children: []
   }
 
-  var defName = propertyName
-  var counter = 1
+  let defName = propertyName
+  let counter = 1
 
   while (defName in cellDefinitions) {
     defName = `${propertyName}${counter}`
@@ -48,6 +52,9 @@ function addModelCell (propertyName, model, cellDefinitions) {
 
   const props = getPropertyOrder(model.properties)
   props.forEach((propName) => {
+    if (model.properties === undefined) {
+      return
+    }
     // we have a circular dependency
     /* eslint-disable no-use-before-define */
     addModel(propName, model.properties[propName], cell.children, cellDefinitions)
@@ -55,8 +62,10 @@ function addModelCell (propertyName, model, cellDefinitions) {
   })
 
   if (model.dependencies) {
-    _.forIn(model.dependencies, (dep, depName) => {
-      const depProps = getPropertyOrder(dep.properties)
+    const dependencies = model.dependencies
+    _.forIn(dependencies, (dep, depName: string) => {
+      const depProps = dep instanceof Array ? dep : getPropertyOrder(dep.properties)
+
       depProps.forEach((propName) => {
         // we have a circular dependency
         /* eslint-disable no-use-before-define */
@@ -76,14 +85,14 @@ function addModelCell (propertyName, model, cellDefinitions) {
  * @param {BunsenRow[]} children - the children we're adding the given model wrapper to
  * @param {BunsenCell[]} cellDefinitions - the set of all cells
  */
-function addModel (propertyName, model, children, cellDefinitions) {
-  const cell = {
+function addModel (propertyName: string, model: BunsenModel, children: BunsenCell[], cellDefinitions: BunsenCellSet) {
+  const cell: BunsenCell = {
     model: propertyName
   }
 
   switch (model.type) {
     case 'array':
-      if (model.items) {
+      if (model.items !== undefined) {
         const cellId = addModelCell(propertyName, model.items, cellDefinitions)
         cell.arrayOptions = {
           itemCell: {
@@ -110,8 +119,14 @@ function addModel (propertyName, model, children, cellDefinitions) {
  * @param {BunsenRow[]} children - the children we're adding the given model wrapper to
  * @param {BunsenCell[]} cellDefinitions - the set of all cells
  */
-function addDependentModel (propertyName, dependencyName, model, children, cellDefinitions) {
-  const cell = {
+function addDependentModel (
+  propertyName: string,
+  dependencyName: string,
+  model: BunsenModel,
+  children: BunsenCell[][],
+  cellDefinitions: BunsenCellSet
+) {
+  const cell: BunsenCell = {
     model: propertyName,
     dependsOn: dependencyName
   }
@@ -140,7 +155,7 @@ function addDependentModel (propertyName, dependencyName, model, children, cellD
  * @param {BunsenModel} schema - the schema to generate a default view for
  * @returns {BunsenView} the generated view
  */
-export function generateView (schema) {
+export function generateView (schema: BunsenModel): BunsenView {
   const model = dereference(schema || {}).schema
 
   const view = {

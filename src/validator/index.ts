@@ -1,7 +1,9 @@
 'use strict'
 
 import '../typedefs'
-import _ from 'lodash'
+import {BunsenCell, BunsenView} from '../view-types'
+import {BunsenModel} from '../model-types'
+import * as _ from 'lodash'
 
 import {dereference} from '../dereference'
 
@@ -28,7 +30,7 @@ export const validateValue = _validateValue
  * @param {CellValidator} cellValidator - the validator instance for a cell in the current view
  * @returns {BunsenValidationResult} the result of validating the cells
  */
-function _validateCells (view, model, cellValidator) {
+function _validateCells (view: BunsenView, model:BunsenModel, cellValidator) {
   // We should already have the error for it not existing at this point, so just fake success
   // this seems wrong, but I'm not sure of a better way to do it - ARM
   if (!view.cells) {
@@ -38,7 +40,7 @@ function _validateCells (view, model, cellValidator) {
     }
   }
 
-  const results = _.map(view.cells, (rootCell, index) => {
+  const results = _.map(view.cells, (rootCell: BunsenCell, index: number) => {
     const cellResults = []
     const path = `#/cells/${index}`
     const cellId = rootCell.extends
