@@ -4,11 +4,17 @@ import * as _ from 'lodash'
 import {validateValue} from './validator'
 import {aggregateResults} from './validator/utils'
 import {getPath} from './dereference'
+import {Action, Dispatch} from 'redux'
 
-export const CHANGE_VALUE = 'CHANGE_VALUE'
-export const VALIDATION_RESOLVED = 'VALIDATION_RESOLVED'
-export const CHANGE_MODEL = 'SET_MODEL'
-export const CHANGE_VIEW = 'CHANGE_VIEW'
+export const CHANGE_VALUE: 'CHANGE_VALUE' = 'CHANGE_VALUE'
+export const VALIDATION_RESOLVED: 'VALIDATION_RESOLVED' = 'VALIDATION_RESOLVED'
+export const CHANGE_MODEL: 'SET_MODEL' = 'SET_MODEL'
+export const CHANGE_VIEW: 'CHANGE_VIEW' = 'CHANGE_VIEW'
+
+export type BunsenActionType = 'CHANGE_VALUE' | 'VALIDATION_RESOLVED' | 'SET_MODEL' | 'CHANGE_VIEW'
+export interface BunsenAction extends Action {
+  type: BunsenActionType
+}
 
 export function changeValue (bunsenId: string, value: any) {
   return {
@@ -105,7 +111,7 @@ function getSchema (
   return {} as BunsenModel
 }
 
-function findSchema (model: BunsenModel, path: string, resolveRef: SchemaRefResolver): BunsenModel {
+function findSchema (model: BunsenModel, path: string | null, resolveRef: SchemaRefResolver): BunsenModel {
   if (model.$ref !== undefined) {
     return getSchema(null, model, resolveRef)
   } else if (path === null) {
@@ -122,7 +128,7 @@ function isObjectSchema (schema: BunsenModel): boolean {
 
 function findDefaults (
   value: any,
-  path: string,
+  path: string | null,
   model: BunsenModel,
   resolveRef: SchemaRefResolver,
   required: boolean
@@ -131,15 +137,16 @@ function findDefaults (
 
   const schemaDefault = _.clone(schema.default)
   if (isObjectSchema(model)) { // Recursing only makes sense for objects
-    let subSchemaDefaults = {}
+    let subSchemaDefaults: {[index: string]: any} = {}
     let hasDefaults = required || false
-    _.forEach(schema.properties, function (subSchema, propName) {
+    _.forEach(schema.properties as BunsenModelSet, function (subSchema, propName: string) {
+      const isRequired: boolean = schema.required === undefined ? false : _.includes(schema.required, propName)
       const defaults = findDefaults(
         value && value[propName],
         null,
         subSchema,
         resolveRef,
-        _.includes(schema.required, propName)
+        isRequired
       )
       if (defaults !== undefined) {
         subSchemaDefaults[propName] = defaults
@@ -155,12 +162,12 @@ function findDefaults (
   return schemaDefault
 }
 
-function isEmptyValue (value) {
+function isEmptyValue (value: any) {
   return [undefined, null].indexOf(value) !== -1 ||
   (_.isObject(value) && Object.keys(value).length === 0) // Check if empty object
 }
 
-function dispatchUpdatedResults (dispatch, results) {
+function dispatchUpdatedResults (dispatch: Dispatch<BunsenAction>, results: BunsenValidationResult[]) {
   const aggregatedResult = aggregateResults(results)
   // TODO: Dispatch an err action
   dispatch(updateValidationResults(aggregatedResult))
@@ -181,11 +188,11 @@ export function validate (
   bunsenId: string,
   inputValue: any,
   renderModel: BunsenModel,
-  validators,
+  validators: ((...args: any[]) => any)[],
   all = Promise.all,
-  forceValidation = false
+  forceValidation: boolean = false
 ) {
-  return function (dispatch: (arg: any)=>{}, getState: () => any) {
+  return function (dispatch: Dispatch<BunsenAction>, getState: () => any) {
     let formValue = getState().value
 
     const isInputValueEmpty = isEmptyValue(inputValue)
@@ -194,7 +201,7 @@ export function validate (
 
     // If an empty value has been provided and there is no previous value then
     // make sure to apply defaults from the model
-    if (isInputValueEmpty && previousValue === undefined) {
+    if (isInputValueEmpty && previousValue === undefined && renderModel.definitions !== undefined) {
       const resolveRef = schemaFromRef(renderModel.definitions)
       const defaultValue = findDefaults(inputValue, bunsenId, renderModel, resolveRef, false)
       if (bunsenId === null && defaultValue === undefined) {
@@ -216,9 +223,9 @@ export function validate (
     // be run on the post-change value rather than the pre-change value
     formValue = getState().value
 
-    const result = validateValue(formValue, renderModel)
+    const result: BunsenValidationResult = validateValue(formValue, renderModel)
 
-    const promises = []
+    const promises:any[] = []
     validators.forEach((validator) => {
       promises.push(validator(formValue))
     })
@@ -231,7 +238,7 @@ export function validate (
 
     all(promises)
       .then((snapshots) => {
-        const results = _.map(snapshots, 'value')
+        const results: BunsenValidationResult[] = _.map<any, BunsenValidationResult>(snapshots, 'value')
         results.push(result)
         dispatchUpdatedResults(dispatch, results)
       })

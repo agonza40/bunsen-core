@@ -2,8 +2,9 @@
 
 import '../typedefs'
 
-import ZSchema from 'z-schema'
-import _ from 'lodash'
+import * as ZSchema from 'z-schema'
+import * as _ from 'lodash'
+import {BunsenModel, BunsenValidationError, BunsenValidationResult} from '../model-types'
 
 const schemaValidator = new ZSchema({
   breakOnFirstError: false
@@ -17,14 +18,14 @@ export const ipAddressRangeRegex = '^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25
  * Go through the errors and convert any 'String does not match pattern...' errors for known regex patterns
  * @param {BunsenValidationError[]} errors - the list of errors which will be updated in-place
  */
-export function translateRegexErrors (errors) {
+export function translateRegexErrors (errors: BunsenValidationError[]) {
   const regexLabels = {
     [integerRegex]: 'for an integer',
     [ipAddressRangeRegex]: 'for an IP address'
   }
 
   errors.forEach((error) => {
-    _.forIn(regexLabels, (value, key) => {
+    _.forIn(regexLabels, (value, key:string) => {
       if (error.message.indexOf(`String does not match pattern ${key}`) === 0) {
         error.message = error.message.replace(key, value)
       }
@@ -36,13 +37,13 @@ export function translateRegexErrors (errors) {
  * Go through the errors and convert any 'Missing required property' errors
  * @param {BunsenValidationError[]} errors - the list of errors which will be updated in-place
  */
-export function translateMissingRequiredPropertyErrors (errors) {
+export function translateMissingRequiredPropertyErrors (errors:BunsenValidationError[]) {
   errors.forEach((error) => {
     const path = error.path
-    const message = error.message
+    const message = error.message || ''
 
     if (message.indexOf('Missing required property:') === 0) {
-      const property = message.split(':').pop().trim()
+      const property = (message.split(':').pop() as string).trim()
       const parent = path
       const trailingSlash = (parent.split('').pop() === '/') ? '' : '/'
 
@@ -62,7 +63,7 @@ export function translateMissingRequiredPropertyErrors (errors) {
  * @param {Boolean} [required] - if true, value must be present
  * @returns {BunsenValidationResult} the results of the value validation
  */
-export function validate (value, model, required) {
+export function validate (value:any, model: BunsenModel, required?: boolean): BunsenValidationResult {
   if (value === '') {
     if (required) {
       return {
@@ -72,11 +73,13 @@ export function validate (value, model, required) {
             message: 'Field is required.',
             path: ''
           }
-        ]
+        ],
+        warnings: []
       }
     } else {
       return {
-        errors: []
+        errors: [],
+        warnings: []
       }
     }
   }

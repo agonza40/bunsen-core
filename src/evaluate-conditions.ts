@@ -4,11 +4,12 @@
  * evaluated/removed.
  */
 
-import _ from 'lodash'
+import * as _ from 'lodash'
 import {pathFinder, meetsCondition} from './utils/conditionals'
+import {BunsenModel} from './model-types'
 
 /* eslint-disable complexity */
-export default function evaluate (model, value, getPreviousValue) {
+export default function evaluate (model: BunsenModel, value: any, getPreviousValue) {
   // In some error conditions, model might be empty, and not crashing helps in debugging
   // because the validation error can actually be seen then -- ARM
   if (!model) {
@@ -22,7 +23,7 @@ export default function evaluate (model, value, getPreviousValue) {
   let retModel = _.clone(model)
   if (retModel.type === 'array') {
     if (Array.isArray(value)) {
-      let itemSchemas = []
+      let itemSchemas: BunsenModel[] = []
       // Deep version of _.uniq
       const potentialSchemas = _.map(value, function (val) {
         return evaluate(model.items, val, getPreviousValue)

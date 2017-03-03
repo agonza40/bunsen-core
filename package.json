@@ -25,6 +25,7 @@
   "devDependencies": {
     "@types/lodash": "^4.14.52",
     "@types/moment": "^2.13.0",
+    "@types/redux": "^3.6.0",
     "@types/seamless-immutable": "^6.1.2",
     "@types/validator": "^6.2.0",
     "@types/z-schema": "^3.16.31",

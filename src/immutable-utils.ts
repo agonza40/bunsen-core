@@ -1,9 +1,9 @@
-import _ from 'lodash'
-import immutable from 'seamless-immutable'
+import * as _ from 'lodash'
+import {from as immutable, Immutable} from 'seamless-immutable'
 
-function unsetArray (obj, path, segments) {
-  const key = segments.splice(0, 1)
-  const index = parseInt(key)
+function unsetArray <T> (obj: T[], path: string, segments: string[]): T {
+  const [key] = segments.splice(0, 1)
+  const index = parseInt(key, 10)
 
   if (segments.length === 0) {
     return obj.slice(0, index).concat(obj.slice(index + 1))
@@ -15,7 +15,7 @@ function unsetArray (obj, path, segments) {
   return obj.slice(0, index).concat([newValue]).concat(obj.slice(index + 1))
 }
 
-function unsetObject (obj, path, segments) {
+function unsetObject <T> (obj: Immutable<T>, path, segments): Immutable<T> {
   const key = segments.splice(0, 1)
 
   if (segments.length === 0) {
@@ -27,14 +27,14 @@ function unsetObject (obj, path, segments) {
 }
 
 /* eslint-disable complexity */
-export function set (item, path, value) {
+export function set (item: any, path: string, value: any): any {
   const segments = path.split('.')
-  const segment = segments.shift()
+  const segment = segments.shift() || ''
   const segmentIsArrayIndex = /^\d+$/.test(segment)
 
   if (segmentIsArrayIndex) {
     item = item || []
-    const index = parseInt(segment)
+    const index = parseInt(segment, 10)
 
     for (let i = 0; i < index + 1; i++) {
       if (item.length < (i + 1)) {
@@ -62,7 +62,7 @@ export function set (item, path, value) {
  * @param {String} path - path to value to unset
  * @returns {Immutable} new value with path unset
  */
-export function unset (obj, path) {
+export function unset <T> (obj: Immutable<T>, path: string): Immutable<T> {
   const segments = path.split('.')
 
   if (Array.isArray(obj)) {
