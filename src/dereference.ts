@@ -1,7 +1,12 @@
 'use strict'
 
 import './typedefs'
-import _ from 'lodash'
+import * as _ from 'lodash'
+import {
+  BunsenModel,
+  BunsenValidationResult,
+  BunsenDereferenceResult
+} from './model-types'
 
 import {
   addErrorResult,
@@ -16,14 +21,20 @@ import {
  * @property {String[]} expandedRefs - a list of all references that were expanded
  * @property {String[]} nestedRefs - a list of references that were expanded within a single recusion stack
  */
-
+export interface Params {
+  fullSchema: BunsenModel
+  subSchemaRef: string
+  results: BunsenValidationResult[]
+  expandedRefs: string[]
+  nestedRefs: string[]
+}
 /**
  * Convert a $ref entry into a dotted path suitable for use with _.get()
  * @param {String} ref - the reference
  * @returns {String} the dotted path
  * @throws {Error} if an error is detected (invalid reference)
  */
-export function getPath (ref) {
+export function getPath (ref: string): string {
   if (ref.indexOf('#/') !== 0) {
     throw new Error(`Invalid reference "${ref}" must begin with "#/"`)
   }
@@ -37,7 +48,7 @@ export function getPath (ref) {
  * @param {Object} subSchema - the sub schema to recurse on
  * @param {Params} params - the params to give to recuseFunc
  */
-export function recurse (recurseFunc, subSchema, params) {
+export function recurse (recurseFunc: (params: Params) => void, subSchema: BunsenModel, params: Params) {
   const fullSchema = params.fullSchema
   const subSchemaRef = params.subSchemaRef
   const results = params.results
@@ -46,15 +57,17 @@ export function recurse (recurseFunc, subSchema, params) {
 
   switch (subSchema.type) {
     case 'object':
-      _.forIn(subSchema.properties, (value, key) => {
-        recurseFunc({
-          fullSchema,
-          subSchemaRef: `${subSchemaRef}/properties/${key}`,
-          results,
-          expandedRefs,
-          nestedRefs
+      if (subSchema.properties) {
+        _.forIn(subSchema.properties, (value: BunsenModel, key: string) => {
+          recurseFunc({
+            fullSchema,
+            subSchemaRef: `${subSchemaRef}/properties/${key}`,
+            results,
+            expandedRefs,
+            nestedRefs
+          })
         })
-      })
+      }
       break
 
     case 'array':
@@ -79,7 +92,7 @@ export function recurse (recurseFunc, subSchema, params) {
  * @param {Params} params - the params to give to recuseFunc
  * @throws Error when cycle detected or on invalid path
  */
-export function processRef (subSchema, params) {
+export function processRef (subSchema: BunsenModel, params: Params) {
   const ref = _.clone(subSchema.$ref)
 
   if (!ref) {
@@ -122,7 +135,7 @@ export function processRef (subSchema, params) {
  * Dereference the given sub schema
  * @param {Params} params - params object
  */
-export function dereferenceSubSchema (params) {
+export function dereferenceSubSchema (params: Params) {
   const fullSchema = params.fullSchema
   const subSchemaRef = params.subSchemaRef
   const results = params.results
@@ -135,7 +148,7 @@ export function dereferenceSubSchema (params) {
     return
   }
 
-  const subSchema = _.get(fullSchema, path)
+  const subSchema = _.get<BunsenModel, BunsenModel>(fullSchema, path)
 
   try {
     processRef(subSchema, params)
@@ -153,19 +166,22 @@ export function dereferenceSubSchema (params) {
  * @param {Object} src - the source schema
  * @returns {BunsenDereferenceResult} the result of the dereference operation
  */
-export function dereference (src) {
+export function dereference (src: BunsenModel): BunsenDereferenceResult {
   const dest = _.cloneDeep(src)
-  const results = []
-  const expandedRefs = []
+  const results: BunsenValidationResult[] = []
+  const expandedRefs: string[] = []
 
-  _.forIn(src.properties, (value, key) => {
-    dereferenceSubSchema({
-      fullSchema: dest,
-      subSchemaRef: `#/properties/${key}`,
-      results,
-      expandedRefs
+  if (src.properties) {
+    _.forIn(src.properties, (value, key) => {
+      dereferenceSubSchema({
+        fullSchema: dest,
+        subSchemaRef: `#/properties/${key}`,
+        results,
+        expandedRefs,
+        nestedRefs: []
+      })
     })
-  })
+  }
 
   return {
     schema: dest,

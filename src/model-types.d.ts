@@ -1,7 +1,7 @@
 import {JSONSchema} from './json-schema'
 
 export interface BunsenModel extends JSONSchema {
-  conditions: ConditionSet
+  conditions: ConditionSet[]
   items?: BunsenModel[] | BunsenModel
   properties?:{[index:string]:BunsenModel}
   patternProperties?:{[index:string]:BunsenModel}
@@ -31,6 +31,19 @@ export interface ConditionSet {
 
 export interface BunsenModelSet {
   [index:string]:BunsenModel
+}
+
+/**
+ * @typedef {Object} BunsenDereferenceResult
+ * The result of dereferencing a schema
+ * @property {BunsenValidationError[]} errors - the list of errors encountered during dereferencing
+ * @property {String[]} refs - the list of references which were encountered/processed
+ * @property {Object} schema - the dereferenced schema
+ */
+export interface BunsenDereferenceResult {
+  errors: BunsenValidationError[]
+  refs: string[]
+  schema: BunsenModel
 }
 
 /**

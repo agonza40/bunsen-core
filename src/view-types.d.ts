@@ -121,7 +121,7 @@ export interface BunsenCell {
   children?: BunsenCell[]
   clearable?: boolean
   collapsible?: boolean
-  conditions?: ConditionSet
+  conditions?: ConditionSet[]
   dependsOn?: string
   description?: string
   disabled?: boolean

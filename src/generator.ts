@@ -132,7 +132,7 @@ function addDependentModel (
   }
 
   const isObject = (model.type === 'object')
-  const isArray = (model.type === 'array') && (model.items.type === 'object')
+  const isArray = (model.type === 'array') && model.items && (model.items.type === 'object')
 
   if (isObject || isArray) {
     const subModel = isArray ? model.items : model

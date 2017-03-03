@@ -1,4 +1,4 @@
-import _ from 'lodash'
+import * as _ from 'lodash'
 
 /**
  * Traverses the object only calling iteratee on the leaf
@@ -10,7 +10,7 @@ export function traverseObjectLeaf (object, iteratee) {
 
   // iterative depth-first traversal
   while (stack.length > 0) {
-    let node = stack.pop()
+    let node = stack.pop() || {value: undefined}
 
     if (_.isObject(node.value) && !_.isEmpty(node.value)) {
       Object.keys(node.value).forEach((property) => {

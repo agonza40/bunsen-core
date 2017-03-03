@@ -1,7 +1,11 @@
 import './typedefs'
+import {BunsenView, BunsenCell, BunsenCellSet} from './view-types'
+import {BunsenModel, Condition, ConditionSet} from './model-types'
 import {meetsCondition} from './utils/conditionals'
 import * as  _ from 'lodash'
-import Immutable from 'seamless-immutable'
+import * as Immutable from 'seamless-immutable'
+
+type ImmutableCell = Immutable.Immutable<BunsenCell>
 
 /**
  * Function used for filtering out undefined values from arrays.
@@ -9,7 +13,7 @@ import Immutable from 'seamless-immutable'
  * @param {any} item Item we want to check the value of
  * @returns {boolean} True if the provided value is not undefined
  */
-function isNotUndefined (item) {
+function isNotUndefined (item: any) {
   return item !== undefined
 }
 
@@ -19,10 +23,10 @@ function isNotUndefined (item) {
  * @param {ValueWrapper} value The wrapped value we want to check the conditions against
  * @returns {Function} Function that returns true if a condition has been met
  */
-function checkConditions (value) {
-  return function (condition) {
-    const metCondition = conditionItem =>
-        _.every(conditionItem, (condition, propName) =>
+function checkConditions (value: ValueWrapper): (condition: ConditionSet) => boolean {
+  return function (condition: ConditionSet): boolean {
+    const metCondition = (conditionItem: Condition[]) =>
+        _.every(conditionItem, (condition, propName: string) =>
           meetsCondition(value.get(propName), condition)
         )
 
@@ -47,9 +51,12 @@ function checkConditions (value) {
  * @param {ValueWrapper} value The wrapped value we want to check the conditions against
  * @returns {Function} Iterator function to check cells
  */
-function checkRootCells (view, value) {
-  return function (cell) {
-    return checkCell(view, value, Immutable.from(cell)).asMutable()
+function checkRootCells (view: BunsenView, value: any): (cell: BunsenCell) => BunsenCell | undefined {
+  return function (cell: BunsenCell): BunsenCell | undefined {
+    const checkedCell = checkCell(view, value, Immutable.from(cell))
+    if (checkedCell) {
+      return checkedCell.asMutable()
+    }
   }
 }
 
@@ -61,10 +68,14 @@ function checkRootCells (view, value) {
  * @param {BunsenCell} cell Cell to check
  * @returns {BunsenCell} The cell after conditions have been processed. If a condition is not met undefined is returned
  */
-function checkCellConditions (view, value, cell) {
+function checkCellConditions (view: BunsenView, value: ValueWrapper, cell: ImmutableCell): ImmutableCell | undefined {
+  const {conditions} = cell
+  if (!conditions) {
+    return
+  }
   // Find a condition that has been met
   const meetsCondition = checkConditions(value)
-  const condition = cell.conditions.find(meetsCondition)
+  const condition = conditions.find(meetsCondition)
   if (condition === undefined) {
     // Returns undefined if conditions aren't met so we can filter
     return
@@ -83,19 +94,28 @@ function checkCellConditions (view, value, cell) {
  * @param {BunsenCell} cell Cell to copy properties onto
  * @returns {BunsenCell} Resulting cell after applying properties from extended cells
  */
-function expandExtendedCell (view, cell) {
-  const cellProps = {}
-  let extendedCell = _.get(view.cellDefinitions, cell.extends)
+function expandExtendedCell (view: BunsenView, cell: ImmutableCell): ImmutableCell {
+  if (!cell.extends) {
+    return cell
+  }
+  const cellProps: BunsenCell = {}
+  let extendedCell = _.get<BunsenCellSet, ImmutableCell>(view.cellDefinitions || {}, cell.extends)
+  if (extendedCell === undefined) {
+    return cell
+  }
   if (extendedCell.extends) {
     extendedCell = Immutable.without(expandExtendedCell(view, extendedCell), 'extends')
   }
-
-  if (extendedCell.itemCell && extendedCell.itemCell.extends) {
-    cellProps.itemCell = expandExtendedCell(view, extendedCell.itemCell)
+  const itemCell = _.get<ImmutableCell, ImmutableCell>(extendedCell, 'arrayOptions.itemCell')
+  if (itemCell && itemCell.extends) {
+    cellProps.arrayOptions = {
+      itemCell: expandExtendedCell(view, itemCell)
+    }
   }
 
   if (extendedCell.children) {
-    cellProps.children = extendedCell.children.map(child => {
+    const children = extendedCell.children as ImmutableCell[]
+    cellProps.children = children.map(child => {
       if (child.extends) {
         return expandExtendedCell(view, child)
       }
@@ -114,23 +134,19 @@ function expandExtendedCell (view, cell) {
  * @param {BunsenCell} cell Cell to check
  * @returns {BunsenCell} Cell with properties from any extended cells
  */
-function checkCell (view, value, cell) {
-  if (cell.extends) {
-    cell = expandExtendedCell(view, cell)
-  }
+function checkCell (view: BunsenView, value: ValueWrapper, cell: ImmutableCell): ImmutableCell | undefined {
+  let newCell: ImmutableCell | undefined = expandExtendedCell(view, cell)
 
-  value = value.pushPath(cell.model)
+  value = value.pushPath(newCell.model)
 
-  if (cell.conditions) { // This cell has conditions
-    cell = checkCellConditions(view, value, cell)
-    if (cell === undefined) {
+  if (newCell.conditions) { // This cell has conditions
+    newCell = checkCellConditions(view, value, cell)
+    if (newCell === undefined) {
       return
     }
   }
 
-  if (cell.children) {
-    cell = checkChildren(view, value, cell)
-  }
+  cell = checkChildren(view, value, cell)
 
   return Immutable.without(cell, 'conditions', 'extends')
 }
@@ -143,9 +159,12 @@ function checkCell (view, value, cell) {
  * @param {BunsenCell} cell Cell to check
  * @returns {BunsenCell} Cell with the children checked
  */
-function checkChildren (view, value, cell) {
-  const children = _.map(cell.children, (child) => {
-    return checkCell(view, value, child)
+function checkChildren (view: BunsenView, value: ValueWrapper, cell: ImmutableCell): ImmutableCell {
+  if (cell.children === undefined) {
+    return cell
+  }
+  const children = cell.children.map(child => {
+    return checkCell(view, value, child as Immutable.Immutable<BunsenCell>)
   })
   .filter(isNotUndefined)
 
@@ -160,7 +179,7 @@ function checkChildren (view, value, cell) {
  * @param {any} value The value we want to check conditions against
  * @returns {BunsenView} View after conditions have been applied
  */
-export default function evaluateView (view, value) {
+export default function evaluateView (view: BunsenView, value: any): BunsenView {
   const wrappedValue = new ValueWrapper(value, [])
   const immutableView = Immutable.from(view)
   if (view.cells === undefined) {
@@ -189,7 +208,7 @@ export default function evaluateView (view, value) {
  * @param {number} [index=0] How many elements we've already gone back
  * @returns {number} How many elements back we need go
  */
-function findRelativePath (path, index = 0) {
+function findRelativePath (path: string[], index = 0): number {
   let nextInPath = _.last(path)
 
   if (nextInPath === '') { // . for sibling
@@ -199,14 +218,14 @@ function findRelativePath (path, index = 0) {
     path.pop()
     if (_.last(path) === '') { // .. for sibling of parent
       path.pop()
-      nextInPath = path.pop().replace('/', '')// get rid of leading slash
+      nextInPath = (path.pop() as string).replace('/', '')// get rid of leading slash
       if (nextInPath === '') {
         return findRelativePath(path, index + 1)
       }
       path.push(nextInPath)
       return index + 1
     } else {
-      nextInPath = path.pop().replace('/', '')// get rid of leading slash
+      nextInPath = (path.pop() as string).replace('/', '')// get rid of leading slash
       if (nextInPath === '') {
         return findRelativePath(path, index)
       }
@@ -214,6 +233,7 @@ function findRelativePath (path, index = 0) {
       return index
     }
   }
+  return index
 }
 /* eslint-enable complexity */
 
@@ -223,16 +243,18 @@ function findRelativePath (path, index = 0) {
  * @class ValueWrapper
  */
 class ValueWrapper {
-  static pathAsArray (path) {
+  private value: any
+  private path: string[]
+  constructor (value: any, curPath: string[] | string) {
+    this.value = value
+    this.path = ValueWrapper.pathAsArray(curPath)
+  }
+
+  static pathAsArray (path: string[] | string): string[] {
     if (!Array.isArray(path)) {
       return path.split('.')
     }
     return path
-  }
-
-  constructor (value, curPath) {
-    this.value = value
-    this.path = ValueWrapper.pathAsArray(curPath)
   }
 
   /**
@@ -246,7 +268,7 @@ class ValueWrapper {
    *
    * @memberOf ValueWrapper
    */
-  get (path) {
+  get (path: string | string[]): any {
     let absolutePath
     if (path === undefined) {
       if (this.path.length <= 0) {
@@ -276,7 +298,7 @@ class ValueWrapper {
    *
    * @memberOf ValueWrapper
    */
-  pushPath (path) {
+  pushPath (path: string | string[] | undefined): ValueWrapper {
     if (path === undefined) {
       return this
     }
